@@ -1,0 +1,78 @@
+import { validate, encode, decode, renderSVG, textRoadmap, sample } from './roadmap.mjs';
+import { assets } from './assets.generated.mjs';
+
+const headers = {
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, MCP-Protocol-Version, MCP-Session-Id, Accept',
+  'Access-Control-Expose-Headers': 'MCP-Protocol-Version'
+};
+const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
+
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+    try {
+      if (['/mcp', '/api/mcp'].includes(url.pathname)) {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { ...headers, Allow: 'POST, OPTIONS' } });
+        const raw = await request.text();
+        if (new TextEncoder().encode(raw).length > 24000) return json({ error: 'MCP request too large' }, 413);
+        let message;
+        try { message = JSON.parse(raw); }
+        catch { return json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); }
+        if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string') return json({ jsonrpc: '2.0', id: message?.id ?? null, error: { code: -32600, message: 'Invalid Request' } });
+        const reply = result => json({ jsonrpc: '2.0', id: message.id, result });
+        if (!Object.hasOwn(message, 'id')) return new Response(null, { status: 202, headers });
+        const versions = ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
+        if (message.method === 'server/discover') return reply({ supportedVersions: versions, capabilities: { tools: {} } });
+        if (message.method === 'initialize') return reply({ protocolVersion: versions.includes(message.params?.protocolVersion) ? message.params.protocolVersion : '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'dream-map-roadmap', version: '1.1.0' }, instructions: '학생이 진로 방향을 명시적으로 선택한 뒤에만 createCareerRoadmap을 호출하세요. 반환된 텍스트 계획과 roadmapUrl 링크를 답변에 함께 표시하세요.' });
+        if (message.method === 'ping') return reply({});
+        if (message.method === 'tools/list') {
+          const spec = JSON.parse(assets['/connector/openapi.json'].body);
+          return reply({ tools: [{ name: 'createCareerRoadmap', title: '선택한 진로의 로드맵 그림 만들기', description: '학생이 진로 방향을 선택한 뒤 실천 계획을 실제 SVG 그림과 PNG 저장 화면으로 변환합니다. 진로 추천·선택 전에는 호출하지 마세요. 이름·연락처·학교명·성적·대화 전문 없이 기간과 활동 계획만 전달하세요. 성공한 결과의 textRoadmap과 roadmapUrl을 학생에게 반드시 함께 표시하세요. 그림 링크를 직접 만들거나 추측하지 마세요.', inputSchema: spec.paths['/api/roadmaps'].post.parameters[0].schema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }] });
+        }
+        if (message.method === 'tools/call') {
+          if (message.params?.name !== 'createCareerRoadmap') return reply({ content: [{ type: 'text', text: 'Unknown tool' }], isError: true });
+          const response = await this.fetch(new Request(`${url.origin}/api/roadmaps`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(message.params.arguments ?? {}) }));
+          const result = await response.json();
+          return reply({ content: [{ type: 'text', text: JSON.stringify(result) }], ...(response.ok ? { structuredContent: result } : {}), isError: !response.ok });
+        }
+        return json({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: 'Method not found' } });
+      }
+      if (url.pathname === '/api/health' && request.method === 'GET') return json({ status: 'ok', service: 'dream-map-roadmap', version: '1.0.0' });
+      if (url.pathname === '/api/roadmaps' && request.method === 'POST') {
+        if (!request.headers.get('Content-Type')?.toLowerCase().includes('application/json')) return json({ error: 'Content-Type은 application/json이어야 합니다.' }, 415);
+        if (Number(request.headers.get('Content-Length')) > 20000) return json({ error: '로드맵 입력이 너무 깁니다.' }, 413);
+        const body = await request.text();
+        if (new TextEncoder().encode(body).length > 20000) return json({ error: '로드맵 입력이 너무 깁니다.' }, 413);
+        const p = validate(JSON.parse(body)), data = encode(p);
+        if (data.length > 12000) return json({ error: '링크에 담기에는 계획이 너무 깁니다. 활동 내용을 조금 줄여 주세요.' }, 413);
+        const imageUrl = `${url.origin}/api/roadmap.svg?data=${data}`;
+        const roadmapUrl = `${url.origin}/roadmap?data=${data}`;
+        return json({ status: 'ready', imageFormat: 'svg', imageUrl, roadmapUrl, textRoadmap: textRoadmap(p),
+          adaptiveCard: { type: 'AdaptiveCard', version: '1.5', $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', body: [{ type: 'TextBlock', text: p.selectedDirection, weight: 'Bolder', size: 'Medium', wrap: true }, { type: 'TextBlock', text: p.summary, wrap: true }], actions: [{ type: 'Action.OpenUrl', title: '나의 로드맵 그림 열기', url: roadmapUrl }] }
+        });
+      }
+      if (url.pathname === '/api/roadmap.svg' && request.method === 'GET') {
+        const plan = decode(url.searchParams.get('data'));
+        return new Response(renderSVG(plan), { headers: { ...headers, 'Content-Type': 'image/svg+xml; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Content-Disposition': 'inline; filename="dream-map.svg"' } });
+      }
+      if (url.pathname === '/sample.svg' && request.method === 'GET') return new Response(renderSVG(sample), { headers: { ...headers, 'Content-Type': 'image/svg+xml; charset=utf-8' } });
+      if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: '지원하지 않는 요청 방식입니다.' }, 405);
+      const path = ['/', '/roadmap'].includes(url.pathname) ? '/index.html' : url.pathname;
+      if (path === '/connector/openapi.json') {
+        const spec = JSON.parse(assets[path].body); spec.host = url.host;
+        return json(spec);
+      }
+      const asset = assets[path];
+      if (!asset) return json({ error: '찾을 수 없는 페이지입니다.' }, 404);
+      return new Response(request.method === 'HEAD' ? null : asset.body, { headers: { ...headers, 'Content-Type': asset.type, 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; frame-src https://copilotstudio.microsoft.com; connect-src 'self'; object-src 'none'; base-uri 'none'" } });
+    } catch (error) {
+      return json({ error: error instanceof SyntaxError ? '올바른 JSON 형식이 필요합니다.' : error.message || '로드맵을 만들지 못했습니다.' }, 400);
+    }
+  }
+};

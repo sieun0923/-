@@ -1,0 +1,12 @@
+import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+await mkdir('docs/assets', { recursive: true });
+const html = (await readFile('public/index.html', 'utf8')).replace('href="/style.css"', 'href="./style.css"').replace('src="/app.mjs"', 'src="./app.mjs"').replace('class="brand" href="/"', 'class="brand" href="./"');
+await writeFile('docs/index.html', html);
+await writeFile('docs/roadmap.html', html);
+await copyFile('public/style.css', 'docs/style.css');
+await copyFile('src/roadmap.mjs', 'docs/roadmap.mjs');
+const app = (await readFile('public/app.mjs', 'utf8')).replace("from '/roadmap.mjs'", "from './roadmap.mjs'").replaceAll("location.pathname === '/roadmap'", "location.pathname.endsWith('/roadmap.html')");
+await writeFile('docs/app.mjs', app);
+await copyFile('public/assets/sample-roadmap.svg', 'docs/assets/sample-roadmap.svg');
+await writeFile('docs/.nojekyll', '');
+console.log('GitHub Pages static site ready in docs/.');
