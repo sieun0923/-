@@ -1,0 +1,14 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { renderSVG, sample } from '../src/roadmap.mjs';
+const routes = { '/index.html': ['public/index.html', 'text/html; charset=utf-8'], '/style.css': ['public/style.css', 'text/css; charset=utf-8'], '/app.mjs': ['public/app.mjs', 'text/javascript; charset=utf-8'], '/roadmap.mjs': ['src/roadmap.mjs', 'text/javascript; charset=utf-8'], '/connector/openapi.json': ['connector/openapi.json', 'application/json; charset=utf-8'] };
+const assets = {};
+for (const [url, [file, type]] of Object.entries(routes)) assets[url] = { body: await readFile(file, 'utf8'), type };
+await mkdir('dist/server', { recursive: true });
+await mkdir('dist/.openai', { recursive: true });
+await mkdir('public/assets', { recursive: true });
+await writeFile('public/assets/sample-roadmap.svg', renderSVG(sample));
+await writeFile('dist/server/assets.generated.mjs', 'export const assets = ' + JSON.stringify(assets) + ';\n');
+await writeFile('dist/server/roadmap.mjs', await readFile('src/roadmap.mjs'));
+await writeFile('dist/server/index.js', await readFile('src/worker.mjs'));
+await writeFile('dist/.openai/hosting.json', await readFile('.openai/hosting.json'));
+console.log('Built Worker + static assets + sample roadmap.');

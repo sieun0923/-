@@ -1,0 +1,167 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Dream Map Roadmap",
+    "description": "학생이 방향을 선택한 뒤 실천 계획을 SVG 그림과 텍스트로 변환합니다. 학생 개인정보를 보내지 마세요.",
+    "version": "1.0.0"
+  },
+  "host": "dream-map-roadmap-sieun.ai-camp-1009.chatgpt.site",
+  "basePath": "/",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/roadmaps": {
+      "post": {
+        "operationId": "createCareerRoadmap",
+        "summary": "선택한 진로의 로드맵 그림 만들기",
+        "description": "학생이 방향을 선택한 뒤에만 호출. 2~6단계 계획과 이번 주 할 일을 전달. 성공하면 textRoadmap과 roadmapUrl을 반드시 답변에 함께 표시. SVG 지원 채널만 imageUrl 첨부. 링크에는 계획 내용이 포함됩니다.",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "directionConfirmed",
+                "selectedDirection",
+                "summary",
+                "weeklyTime",
+                "stages",
+                "thisWeek"
+              ],
+              "properties": {
+                "directionConfirmed": {
+                  "type": "boolean",
+                  "description": "학생이 진로 방향을 명시적으로 선택한 뒤에만 true. 선택 전에는 호출 금지."
+                },
+                "selectedDirection": {
+                  "type": "string",
+                  "description": "학생이 선택한 방향. 이름, 연락처, 정확한 성적 제외.",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "수준과 생활 패턴에 맞춘 계획 설명",
+                  "minLength": 1,
+                  "maxLength": 180
+                },
+                "weeklyTime": {
+                  "type": "string",
+                  "description": "활용 시간",
+                  "minLength": 1,
+                  "maxLength": 90
+                },
+                "stages": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "period",
+                      "title",
+                      "actions",
+                      "outcome"
+                    ],
+                    "properties": {
+                      "period": {
+                        "type": "string",
+                        "description": "기간. 예: 1~2주",
+                        "minLength": 1,
+                        "maxLength": 30
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "단계 제목",
+                        "minLength": 1,
+                        "maxLength": 60
+                      },
+                      "actions": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "items": {
+                          "type": "string",
+                          "description": "실천 활동",
+                          "minLength": 1,
+                          "maxLength": 150
+                        }
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "description": "남길 결과물",
+                        "minLength": 1,
+                        "maxLength": 100
+                      }
+                    }
+                  }
+                },
+                "thisWeek": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "string",
+                    "description": "이번 주 할 일",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "로드맵 생성 성공",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "imageFormat": {
+                  "type": "string"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "description": "SVG 이미지 링크. 미리보기를 지원하지 않는 채널은 roadmapUrl 사용."
+                },
+                "roadmapUrl": {
+                  "type": "string",
+                  "description": "답변에 반드시 표시할 그림 보기 및 PNG 저장 링크"
+                },
+                "textRoadmap": {
+                  "type": "string",
+                  "description": "학생에게 제시할 텍스트 계획"
+                },
+                "adaptiveCard": {
+                  "type": "object",
+                  "description": "그림 열기 버튼 카드. 자동 렌더링은 보장하지 않으므로 응답 설정에서 명시적으로 전송."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력 오류 또는 방향 미선택"
+          },
+          "413": {
+            "description": "요청 또는 링크가 너무 김"
+          },
+          "415": {
+            "description": "JSON 요청 필요"
+          }
+        }
+      }
+    }
+  }
+}
