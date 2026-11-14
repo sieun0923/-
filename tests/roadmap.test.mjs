@@ -45,3 +45,22 @@ test('인증정보 없는 연결 명세가 실제 서비스 호스트를 사용�
   const spec = await (await worker.fetch(new Request('https://my.example/connector/openapi.json'))).json();
   assert.equal(spec.swagger, '2.0'); assert.equal(spec.host, 'my.example'); assert.ok(spec.paths['/api/roadmaps'].post);
 });
+const rpc = (method, params = {}, id = 1) => new Request('https://example.com/api/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params }) });
+test('MCP 초기화, 도구 검색과 실제 도구 호출을 지원한다', async () => {
+  const init = await (await worker.fetch(rpc('initialize', { protocolVersion: '2025-03-26' }))).json();
+  assert.equal(init.result.protocolVersion, '2025-03-26');
+  const tools = await (await worker.fetch(rpc('tools/list'))).json();
+  assert.equal(tools.result.tools[0].name, 'createCareerRoadmap');
+  const called = await (await worker.fetch(rpc('tools/call', { name: 'createCareerRoadmap', arguments: sample }))).json();
+  assert.equal(called.result.isError, false);
+  assert.equal((await worker.fetch(new Request(called.result.structuredContent.imageUrl))).status, 200);
+  const rejected = await (await worker.fetch(rpc('tools/call', { name: 'createCareerRoadmap', arguments: { ...sample, directionConfirmed: false } }))).json();
+  assert.equal(rejected.result.isError, true);
+});
+test('MCP 알림, 잘못된 요청과 지원하지 않는 메서드를 처리한다', async () => {
+  const notification = new Request('https://example.com/api/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) });
+  assert.equal((await worker.fetch(notification)).status, 202);
+  assert.equal((await (await worker.fetch(rpc('missing'))).json()).error.code, -32601);
+  assert.equal((await worker.fetch(new Request('https://example.com/api/mcp'))).status, 405);
+  assert.equal((await (await worker.fetch(new Request('https://example.com/api/mcp', { method: 'POST', body: '{' }))).json()).error.code, -32700);
+});

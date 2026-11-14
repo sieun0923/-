@@ -12,6 +12,8 @@ Copilot Studio 진로 상담 에이전트가 학생이 선택한 진로의 실�
 - `connector/parent-agent-addendum.txt`: 부모 에이전트에 추가할 도구 사용 지침.
 - [Copilot Studio 연결 방법](connector/SETUP.ko.md).
 
+현재 Dream Map 편집 화면에서는 **도구 추가 → 추가 → MCP**로 `https://dream-map-roadmap-sieun.ai-camp-1009.chatgpt.site/api/mcp`를 연결합니다. REST API와 MCP가 같은 검증 및 렌더러를 사용합니다.
+
 학생이 방향을 고르기 전에는 API가 계획을 생성하지 않도록 `directionConfirmed: true`를 요구합니다. 학생이 실제로 선택했는지 판단하는 책임은 부모 에이전트에 있습니다. 서버가 대화를 직접 읽거나 그 선택을 독립적으로 검증하지는 않습니다.
 
 ## 실행

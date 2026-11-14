@@ -17,6 +17,21 @@ GitHub에 코드를 올리는 일과 API를 배포하는 일은 별개입니다.
 
 ## 1. Copilot Studio에 REST API 도구 추가
 
+### 현재 Dream Map 화면: MCP 연결 사용
+
+2026-11-14에 실제 부모 에이전트 편집 화면을 확인한 결과, **도구 추가 → 추가** 메뉴에는 MCP와 워크플로가 표시됩니다. 이 환경에서는 아래 MCP 연결을 우선 사용합니다. REST API 명세는 해당 기능이 제공되는 다른 환경용으로 함께 보관합니다.
+
+1. 부모 에이전트 **도구 + → 추가 → 모델 컨텍스트 프로토콜(MCP)**.
+2. 서버 이름: `Dream Map Roadmap`.
+3. 서버 URL: `https://dream-map-roadmap-sieun.ai-camp-1009.chatgpt.site/api/mcp`.
+4. 인증: `없음`.
+5. `createCareerRoadmap` 도구가 표시되면 선택하여 추가합니다.
+6. `parent-agent-addendum.txt`를 기존 부모 지침의 끝에 추가하고 저장·게시합니다.
+
+`/api/mcp`는 Microsoft용 공개·무상태 Streamable HTTP 연결입니다. 기존 공개 렌더링 API와 같은 검증을 적용하며 저장된 개인정보를 조회하지 않습니다. `/mcp`는 Sites의 기본 MCP 연결 경로입니다.
+
+### REST API 가져오기를 지원하는 환경
+
 스크린샷처럼 부모 에이전트의 **빌드** 화면에서 부모 카드의 **도구 + → REST API**를 엽니다. 또는 **도구 → 도구 추가 → 새 도구 → REST API**를 선택합니다. UI 이름은 환경에 따라 다를 수 있습니다.
 
 1. `openapi.json`을 업로드합니다. 배포된 서비스의 `/connector/openapi.json`을 받으면 실제 호스트가 반영됩니다.
